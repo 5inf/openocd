@@ -96,6 +96,16 @@ TAGS
 # ctags tag files
 tags
 
+build
+.vs
+CodeDB
+VisualGDBCache
+*.sln
+*.vgdbcmake
+VisualGDB
+toolchain.cmake
+/*.user
+
 # GNU Global tag files
 GPATH
 GRTAGS
