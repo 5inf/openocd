@@ -75,7 +75,7 @@ uint32_t advanced_elf_image_find_symbol(struct advanced_elf_image *image, const 
     
     for (int i = 0; i < image->num_symbols; i++)
     {
-        if (image->symbols[i].st_name >= image->strtab_size)
+        if ((int)image->symbols[i].st_name >= image->strtab_size)
             continue;
         if (!strcmp(image->strtab + image->symbols[i].st_name, symbol_name))
             return image->symbols[i].st_value;
@@ -154,7 +154,7 @@ int advanced_elf_image_open(struct advanced_elf_image *elf, const char *URL)
             retval = fileio_read(elf->fileio, elf->strtab_size, elf->strtab, &done);
             if (retval != ERROR_OK)
                 return retval;
-            if (done != elf->strtab_size)
+            if ((int)done != elf->strtab_size)
                 return ERROR_IMAGE_FORMAT_ERROR;
 
             
