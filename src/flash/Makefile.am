@@ -2,7 +2,8 @@
 
 noinst_LTLIBRARIES += %D%/libflash.la
 %C%_libflash_la_SOURCES = \
-	%D%/common.c %D%/common.h
+	%D%/common.c %D%/common.h \
+	%D%/../helper/log.h \
 	%D%/FLASHPlugin.c %D%/advanced_elf_image.c
 
 %C%_libflash_la_LIBADD = \
