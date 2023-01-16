@@ -96,7 +96,7 @@ jobs:
       - name: Delete 'latest' Release
         uses: dev-drprasad/delete-tag-and-release@v0.2.0
         with:
-          delete_release: true
+          delete_release: false
           tag_name: ${{ env.RELEASE_NAME }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
