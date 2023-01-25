@@ -226,8 +226,6 @@ static inline int socket_select(int max_fd,
 #endif
 }
 
-typedef uint32_t Elf32_Size;
-
 #ifndef HAVE_ELF_H
 
 typedef uint32_t Elf32_Addr;
@@ -262,17 +260,17 @@ typedef struct {
     Elf32_Word	sh_flags;	/* Section flags. */
     Elf32_Addr	sh_addr;	/* Address in memory image. */
     Elf32_Off	sh_offset;	/* Offset in file. */
-    Elf32_Size	sh_size;	/* Size in bytes. */
+    Elf32_Word	sh_size;	/* Size in bytes. */
     Elf32_Word	sh_link;	/* Index of a related section. */
     Elf32_Word	sh_info;	/* Depends on section type. */
-    Elf32_Size	sh_addralign;	/* Alignment in bytes. */
-    Elf32_Size	sh_entsize;	/* Size of each entry in section. */
+    Elf32_Word	sh_addralign;	/* Alignment in bytes. */
+    Elf32_Word	sh_entsize;	/* Size of each entry in section. */
 } Elf32_Shdr;
 
 typedef struct {
     Elf32_Word	st_name;	/* String table index of name. */
     Elf32_Addr	st_value;	/* Symbol value. */
-    Elf32_Size	st_size;	/* Size of associated object. */
+    Elf32_Word	st_size;	/* Size of associated object. */
     unsigned char	st_info;	/* Type and binding information. */
     unsigned char	st_other;	/* Reserved (not used). */
     Elf32_Half	st_shndx;	/* Section index of symbol. */
@@ -294,10 +292,10 @@ typedef struct {
 	Elf32_Off p_offset;		/* Segment file offset */
 	Elf32_Addr p_vaddr;		/* Segment virtual address */
 	Elf32_Addr p_paddr;		/* Segment physical address */
-	Elf32_Size p_filesz;	/* Segment size in file */
-	Elf32_Size p_memsz;		/* Segment size in memory */
+	Elf32_Word p_filesz;	/* Segment size in file */
+	Elf32_Word p_memsz;		/* Segment size in memory */
 	Elf32_Word p_flags;		/* Segment flags */
-	Elf32_Size p_align;		/* Segment alignment */
+	Elf32_Worde p_align;		/* Segment alignment */
 } Elf32_Phdr;
 
 #define PT_LOAD			1		/* Loadable program segment */
@@ -339,6 +337,30 @@ typedef struct {
 	Elf64_Xword p_memsz;	/* Segment size in memory */
 	Elf64_Xword p_align;	/* Segment alignment */
 } Elf64_Phdr;
+
+typedef struct
+{
+  Elf64_Word	sh_name;		/* Section name (string tbl index) */
+  Elf64_Word	sh_type;		/* Section type */
+  Elf64_Xword	sh_flags;		/* Section flags */
+  Elf64_Addr	sh_addr;		/* Section virtual addr at execution */
+  Elf64_Off	sh_offset;		/* Section file offset */
+  Elf64_Xword	sh_size;		/* Section size in bytes */
+  Elf64_Word	sh_link;		/* Link to another section */
+  Elf64_Word	sh_info;		/* Additional section information */
+  Elf64_Xword	sh_addralign;		/* Section alignment */
+  Elf64_Xword	sh_entsize;		/* Entry size if section holds table */
+} Elf64_Shdr;
+
+typedef struct
+{
+  Elf64_Word	st_name;		/* Symbol name (string tbl index) */
+  unsigned char	st_info;		/* Symbol type and binding */
+  unsigned char st_other;		/* Symbol visibility */
+  Elf64_Section	st_shndx;		/* Section index */
+  Elf64_Addr	st_value;		/* Symbol value */
+  Elf64_Xword	st_size;		/* Symbol size */
+} Elf64_Sym;
 
 #endif /* HAVE_ELF64 */
 
