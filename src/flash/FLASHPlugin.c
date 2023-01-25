@@ -99,7 +99,7 @@ struct loaded_plugin
     struct plugin_timeouts timeouts;
 };
 
-int save_region(struct target *target, struct memory_backup *region, Elf32_Addr sh_addr, Elf32_Size sh_size, int sectionNumber)
+int save_region(struct target *target, struct memory_backup *region, Elf32_Addr sh_addr, Elf32_Word sh_size, int sectionNumber)
 {
     region->base_address = sh_addr;
     region->size = sh_size;
