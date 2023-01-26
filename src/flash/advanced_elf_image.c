@@ -68,7 +68,7 @@ int advanced_elf_image_read_section(struct advanced_elf_image *elf, int section,
 }
 
 
-uint32_t advanced_elf_image_find_symbol(struct advanced_elf_image *image, const char *symbol_name)
+uint64_t advanced_elf_image_find_symbol(struct advanced_elf_image *image, const char *symbol_name)
 {
     if (!image || !image->symbols || !image->strtab)
         return 0;
@@ -85,8 +85,42 @@ uint32_t advanced_elf_image_find_symbol(struct advanced_elf_image *image, const 
 }
 
 
-int advanced_elf_image_open(struct advanced_elf_image *elf, const char *URL)
+int advanced_elf_image_open(struct advanced_elf_image *elfold, "elf")
 {
+
+    struct image image;
+    const char *type_string;
+    image_open(&image, url, type_string);
+    if (retval != ERROR_OK)
+		return retval;
+    
+    if(image->type!=IMAGE_ELF){
+        LOG_ERROR("Not an ELF file.");
+        return ERROR_IMAGE_FORMAT_ERROR;
+    }
+    struct image_elf *elf = image->type_private;
+    if(elf->is_64_bit){
+        LOG_INFO("64bit ELF file found");
+    }
+    if (elf->header.e_ident[EI_CLASS] != ELFCLASS32) {
+        LOG_INFO("32bit ELF file found");
+    }else if (elf->header.e_ident[EI_CLASS] != ELFCLASS64)
+        LOG_INFO("64bit ELF file found");
+    }else{
+        LOG_ERROR("invalid ELF file, only 32bits and 64bits files are supported");
+        return ERROR_IMAGE_FORMAT_ERROR;
+    }
+    elf
+
+
+
+
+
+
+
+
+
+
     memset(elf, 0, sizeof(struct advanced_elf_image));
     int retval = fileio_open(&elf->fileio, URL, FILEIO_READ, FILEIO_BINARY);
     size_t done;
@@ -102,24 +136,28 @@ int advanced_elf_image_open(struct advanced_elf_image *elf, const char *URL)
         return ERROR_IMAGE_FORMAT_ERROR;
     }
     if (elf->header.e_ident[EI_CLASS] != ELFCLASS32) {
-        LOG_ERROR("invalid ELF file, only 32bits files are supported");
+        LOG_INFO("32bit ELF file found");
+    }else if (elf->header.e_ident[EI_CLASS] != ELFCLASS64)
+        LOG_INFO("64bit ELF file found");
+    }else{
+        LOG_ERROR("invalid ELF file, only 32bits and 64bits files are supported");
         return ERROR_IMAGE_FORMAT_ERROR;
     }
     
     elf->num_sections = elf->header.e_shnum;
-    elf->sections = (Elf32_Shdr *)calloc(elf->header.e_shnum, sizeof(Elf32_Shdr));
+    elf->sections = (Elf64_Shdr *)calloc(elf->header.e_shnum, sizeof(Elf64_Shdr));
     retval = fileio_seek(elf->fileio, elf->header.e_shoff);
     if (retval != ERROR_OK)
         return retval;
     
-    retval = fileio_read(elf->fileio, sizeof(Elf32_Shdr) * elf->header.e_shnum, elf->sections, &done);
+    retval = fileio_read(elf->fileio, sizeof(Elf64_Shdr) * elf->header.e_shnum, elf->sections, &done);
     if (retval != ERROR_OK)
         return retval;
     
     for (int i = 0; i < elf->num_sections; i++)
         if (elf->sections[i].sh_type == 2 /*SHT_SYMTAB*/)
         {
-            if (elf->sections[i].sh_entsize != sizeof(Elf32_Sym))
+            if (elf->sections[i].sh_entsize != sizeof(Elf64_Sym))
             {
                 LOG_ERROR("Unexpected symtab entry size in %s: %d.", URL, elf->sections[i].sh_entsize);
                 return ERROR_IMAGE_FORMAT_ERROR;       
@@ -131,10 +169,10 @@ int advanced_elf_image_open(struct advanced_elf_image *elf, const char *URL)
             if (retval != ERROR_OK)
                 return retval;
             
-            retval = fileio_read(elf->fileio, sizeof(Elf32_Sym) * elf->num_symbols, elf->symbols, &done);
+            retval = fileio_read(elf->fileio, sizeof(Elf64_Sym) * elf->num_symbols, elf->symbols, &done);
             if (retval != ERROR_OK)
                 return retval;
-            if (done != (sizeof(Elf32_Sym) * elf->num_symbols))
+            if (done != (sizeof(Elf64_Sym) * elf->num_symbols))
                 return ERROR_IMAGE_FORMAT_ERROR;
             
             int str = elf->sections[i].sh_link;

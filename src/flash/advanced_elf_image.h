@@ -24,18 +24,15 @@
 
 #include <target/image.h>
 
-struct advanced_elf_image
-{
-    struct fileio *fileio;
-    Elf32_Ehdr header;
-    Elf32_Shdr *sections;
-    int num_sections;
-    
+struct advanced_elf_image {
+	struct *image_elf;
+    union{
+        Elf32_Sym *symbols32;
+        Elf64_Sym *symbols64;
+    };
+    int num_symbols;
     char *strtab;
     int strtab_size;
-    
-    Elf32_Sym *symbols;
-    int num_symbols;
 };
 
 int advanced_elf_image_open(struct advanced_elf_image *image, const char *URL);

@@ -41,19 +41,19 @@ struct plugin_flash_bank
 {
     int probed;
     struct advanced_elf_image image;
-    uint32_t FLASHPlugin_InitDone;
-    uint32_t FLASHPlugin_Probe;
-    uint32_t FLASHPlugin_FindWorkArea;
-    uint32_t FLASHPlugin_EraseSectors;
-    uint32_t FLASHPlugin_Unload;
+    uint64_t FLASHPlugin_InitDone;
+    uint64_t FLASHPlugin_Probe;
+    uint64_t FLASHPlugin_FindWorkArea;
+    uint64_t FLASHPlugin_EraseSectors;
+    uint64_t FLASHPlugin_Unload;
     
-    uint32_t FLASHPlugin_ProgramSync;
-    uint32_t FLASHPlugin_ProgramAsync;
-    uint32_t FLASHPlugin_NotImplemented;
+    uint64_t FLASHPlugin_ProgramSync;
+    uint64_t FLASHPlugin_ProgramAsync;
+    uint64_t FLASHPlugin_NotImplemented;
     
-    //Optional entries
-    uint32_t FLASHPlugin_ProtectSectors;
-    uint32_t FLASHPlugin_CheckSectorProtection;
+    //Op64tional entries
+    uint64_t FLASHPlugin_ProtectSectors;
+    uint64_t FLASHPlugin_CheckSectorProtection;
     
     struct WorkAreaInfo WorkArea;
     unsigned int stack_size;
@@ -137,10 +137,10 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
     
     for (int i = 0; i < image->num_sections; i++)
     {
-        if (!(image->sections[i].sh_flags & 2 /*SHF_ALLOC*/))
+        if (!(image->sections32[i].sh_flags & 2 /*SHF_ALLOC*/))
             continue;
         struct memory_backup *region = &plugin->regions[plugin->region_count];
-        retval = save_region(target, region, image->sections[i].sh_addr, image->sections[i].sh_size, i);
+        retval = save_region(target, region, image->32[i].sh_addr, image->sections32[i].sh_size, i);
         if (retval != ERROR_OK)
             break;
         
@@ -163,7 +163,7 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
         void *pBuf = malloc(maxSize);
         for (int i = 0; i < plugin->region_count; i++)
         {
-            if (plugin->regions[i].original_section < 0 || image->sections[plugin->regions[i].original_section].sh_type == 8 /* NOBITS */)
+            if (plugin->regions[i].original_section < 0 || image->sections32[plugin->regions[i].original_section].sh_type == 8 /* NOBITS */)
                 continue;
             
             size_t done;
