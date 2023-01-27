@@ -166,7 +166,7 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
         for (int i = 0; i < plugin->region_count; i++)
         {
             //TODO: 32/64 bit check !!!
-            if (plugin->regions[i].original_section < 0 || image->sections[plugin->regions[i].original_section].sh_type == 8 /* NOBITS */)
+            if (plugin->regions[i].original_section < 0 || image->sections64[plugin->regions[i].original_section].sh_type == 8 /* NOBITS */)
                 continue;
             
             size_t done;
@@ -201,18 +201,18 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
     if (retval == ERROR_OK && init_done_address)
     {
         struct reg_param reg_params[1];
-        init_reg_param(&reg_params[0], "sp", 32, PARAM_IN);
-        buf_set_u32(reg_params[0].value, 0, 32, plugin->sp); 
+        init_reg_param(&reg_params[0], "sp", 64, PARAM_IN);
+        buf_set_u64(reg_params[0].value, 0, 64, plugin->sp); 
         
         init_done_address &= ~1;
         
-        struct armv7m_algorithm armv7m_info;
-        armv7m_info.common_magic = ARMV7M_COMMON_MAGIC;
-        armv7m_info.core_mode = ARM_MODE_THREAD;
-        int bp = breakpoint_add(target, init_done_address, 2, BKPT_SOFT);
+        struct armv8_algorithm armv8_info;
+        armv8_info.common_magic = ARMV8_COMMON_MAGIC;
+        armv8_info.core_mode = ARM_MODE_THREAD;
+        uint64_t bp = breakpoint_add(target, init_done_address, 2, BKPT_SOFT);
 	    (void)bp;
 
-        retval = target_run_algorithm(target, 0, NULL, sizeof(reg_params) / sizeof(reg_params[0]), reg_params, plugin->entry, init_done_address, plugin->timeouts.load, &armv7m_info);
+        retval = target_run_algorithm(target, 0, NULL, sizeof(reg_params) / sizeof(reg_params[0]), reg_params, plugin->entry, init_done_address, plugin->timeouts.load, &armv8_info);
         breakpoint_remove(target, init_done_address);
         if (retval != ERROR_OK)
             LOG_ERROR("FLASH plugin did not call FLASHPlugin_InitDone(). Ensure it is declared as non-inline and try increasing load timeout setting inside the plugin timeout table.");
@@ -328,9 +328,7 @@ FLASH_BANK_COMMAND_HANDLER(plugin_flash_bank_command)
     memset(info, 0, sizeof(struct plugin_flash_bank));
     
     const char *URL = CMD_ARGV[6];
-
-    
-    
+   
     retval = advanced_elf_image_open(&info->image, URL);
     if (retval != ERROR_OK)
         return retval;
@@ -343,7 +341,6 @@ FLASH_BANK_COMMAND_HANDLER(plugin_flash_bank_command)
         LOG_ERROR("FLAHSPLUGIN loaded an elf for arch ??? and target is ???. UNSUPPORTED!.");
         return ERROR_FLASH_BANK_INVALID;
     }
-        
     
     retval = locate_symbol(&info->image, URL, &info->FLASHPlugin_InitDone, "FLASHPlugin_InitDone");
     if (retval != ERROR_OK)
@@ -378,7 +375,6 @@ FLASH_BANK_COMMAND_HANDLER(plugin_flash_bank_command)
     info->FLASHPlugin_CheckSectorProtection = advanced_elf_image_find_symbol(&info->image, "FLASHPlugin_CheckSectorProtection");
     info->FLASHPlugin_ProtectSectors = advanced_elf_image_find_symbol(&info->image, "FLASHPlugin_ProtectSectors");
     
-  
     info->stack_size = stackSize;
     bank->driver_priv = info;
     info->probed = 0;
