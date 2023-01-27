@@ -25,6 +25,7 @@
 #include <helper/binarybuffer.h>
 #include <target/algorithm.h>
 #include <target/armv7m.h>
+#include <target/armv8.h>
 #include <target/breakpoints.h>
 #include <target/image.h>
 #include "advanced_elf_image.h"
@@ -333,6 +334,16 @@ FLASH_BANK_COMMAND_HANDLER(plugin_flash_bank_command)
     retval = advanced_elf_image_open(&info->image, URL);
     if (retval != ERROR_OK)
         return retval;
+
+    if(is_armv7m(target_to_armv7m(bank->target)) && info->image.header.e_machine == 0x28 && !info->image.is_64_bit){ //Arm (up to Armv7/AArch32)
+        LOG_INFO("FLAHSPLUGIN loaded an ELF for Arm up to Armv7/AArch32 and target is Armv7. OK.");
+    }else if(is_armv8(target_to_armv8(bank->target)) && info->image.header64.e_machine == 0xB7 && info->image.is_64_bit){ //Arm 64-bits (Armv8/AArch64)
+        LOG_WARNING("FLAHSPLUGIN loaded an ELF for Armv8/aarch64 and target is Armv8. UNTESTED!.");
+    }else{
+        LOG_ERROR("FLAHSPLUGIN loaded an elf for arch ??? and target is ???. UNSUPPORTED!.");
+        return ERROR_FLASH_BANK_INVALID;
+    }
+        
     
     retval = locate_symbol(&info->image, URL, &info->FLASHPlugin_InitDone, "FLASHPlugin_InitDone");
     if (retval != ERROR_OK)
@@ -608,7 +619,7 @@ static int plugin_probe(struct flash_bank *bank)
     struct plugin_flash_bank *plugin_info = bank->driver_priv;
     struct FLASHBankInfo bankInfo;
     struct loaded_plugin loaded_plugin;
-    
+
     plugin_info->probed = 1;
     
     int retval = loaded_plugin_load(target, &plugin_info->image, &loaded_plugin, plugin_info->FLASHPlugin_InitDone, plugin_info->stack_size);
