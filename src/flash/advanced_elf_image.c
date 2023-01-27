@@ -34,7 +34,7 @@ void advanced_elf_image_close(struct advanced_elf_image *image)
         fileio_close(image->fileio);
         image->fileio = NULL;        
     }
-    
+
     if (image->sections)
     {
         free(image->sections);
@@ -68,66 +68,42 @@ int advanced_elf_image_read_section(struct advanced_elf_image *elf, int section,
 }
 
 
-uint64_t advanced_elf_image_find_symbol(struct advanced_elf_image *image, const char *symbol_name)
+uint64_t advanced_elf_image_find_symbol(struct advanced_elf_image *elf, const char *symbol_name)
 {
-    if (!image || !image->symbols || !image->strtab)
+    if (!elf || !elf->symbols || !elf->strtab)
         return 0;
     
-    for (int i = 0; i < image->num_symbols; i++)
-    {
-        if ((int)image->symbols[i].st_name >= image->strtab_size)
-            continue;
-        if (!strcmp(image->strtab + image->symbols[i].st_name, symbol_name))
-            return image->symbols[i].st_value;
+    if(!elf->is_64_bit){
+        for (int i = 0; i < elf->num_symbols; i++)
+        {
+            if ((int)elf->symbols[i].st_name >= elf->strtab_size)
+                continue;
+            if (!strcmp(elf->strtab + elf->symbols[i].st_name, symbol_name))
+                return elf->symbols[i].st_value;
+        }
+    }else{
+       for (int i = 0; i < elf->num_symbols; i++)
+        {
+            if ((int)elf->symbols64[i].st_name >= elf->strtab_size)
+                continue;
+            if (!strcmp(elf->strtab + elf->symbols64[i].st_name, symbol_name))
+                return elf->symbols64[i].st_value;
+        } 
     }
+
     
     return 0;
 }
 
-
-int advanced_elf_image_open(struct advanced_elf_image *elfold, "elf")
+int advanced_elf_image_open(struct advanced_elf_image *elf, const char *URL)
 {
-
-    struct image image;
-    const char *type_string;
-    image_open(&image, url, type_string);
-    if (retval != ERROR_OK)
-		return retval;
-    
-    if(image->type!=IMAGE_ELF){
-        LOG_ERROR("Not an ELF file.");
-        return ERROR_IMAGE_FORMAT_ERROR;
-    }
-    struct image_elf *elf = image->type_private;
-    if(elf->is_64_bit){
-        LOG_INFO("64bit ELF file found");
-    }
-    if (elf->header.e_ident[EI_CLASS] != ELFCLASS32) {
-        LOG_INFO("32bit ELF file found");
-    }else if (elf->header.e_ident[EI_CLASS] != ELFCLASS64)
-        LOG_INFO("64bit ELF file found");
-    }else{
-        LOG_ERROR("invalid ELF file, only 32bits and 64bits files are supported");
-        return ERROR_IMAGE_FORMAT_ERROR;
-    }
-    elf
-
-
-
-
-
-
-
-
-
-
     memset(elf, 0, sizeof(struct advanced_elf_image));
     int retval = fileio_open(&elf->fileio, URL, FILEIO_READ, FILEIO_BINARY);
     size_t done;
     if (retval != ERROR_OK)
         return retval;
     
-    retval = fileio_read(elf->fileio, sizeof(elf->header), &elf->header, &done);
+    retval = fileio_read(elf->fileio, sizeof(elf->header64), &elf->header64, &done);
     if (retval != ERROR_OK)
         return retval;
     
@@ -135,74 +111,143 @@ int advanced_elf_image_open(struct advanced_elf_image *elfold, "elf")
         LOG_ERROR("invalid ELF file, bad magic number");
         return ERROR_IMAGE_FORMAT_ERROR;
     }
-    if (elf->header.e_ident[EI_CLASS] != ELFCLASS32) {
+    if (elf->header.e_ident[EI_CLASS] == ELFCLASS32) {
         LOG_INFO("32bit ELF file found");
-    }else if (elf->header.e_ident[EI_CLASS] != ELFCLASS64)
+    }else if (elf->header.e_ident[EI_CLASS] == ELFCLASS64){
+        elf->is_64_bit=true;
         LOG_INFO("64bit ELF file found");
     }else{
         LOG_ERROR("invalid ELF file, only 32bits and 64bits files are supported");
         return ERROR_IMAGE_FORMAT_ERROR;
     }
-    
-    elf->num_sections = elf->header.e_shnum;
-    elf->sections = (Elf64_Shdr *)calloc(elf->header.e_shnum, sizeof(Elf64_Shdr));
-    retval = fileio_seek(elf->fileio, elf->header.e_shoff);
-    if (retval != ERROR_OK)
-        return retval;
-    
-    retval = fileio_read(elf->fileio, sizeof(Elf64_Shdr) * elf->header.e_shnum, elf->sections, &done);
-    if (retval != ERROR_OK)
-        return retval;
-    
-    for (int i = 0; i < elf->num_sections; i++)
-        if (elf->sections[i].sh_type == 2 /*SHT_SYMTAB*/)
-        {
-            if (elf->sections[i].sh_entsize != sizeof(Elf64_Sym))
-            {
-                LOG_ERROR("Unexpected symtab entry size in %s: %d.", URL, elf->sections[i].sh_entsize);
-                return ERROR_IMAGE_FORMAT_ERROR;       
-            }
-    
-            elf->num_symbols = elf->sections[i].sh_size / elf->sections[i].sh_entsize;
-            elf->symbols = calloc(elf->num_symbols, elf->sections[i].sh_entsize);
-            retval = fileio_seek(elf->fileio, elf->sections[i].sh_offset);
-            if (retval != ERROR_OK)
-                return retval;
-            
-            retval = fileio_read(elf->fileio, sizeof(Elf64_Sym) * elf->num_symbols, elf->symbols, &done);
-            if (retval != ERROR_OK)
-                return retval;
-            if (done != (sizeof(Elf64_Sym) * elf->num_symbols))
-                return ERROR_IMAGE_FORMAT_ERROR;
-            
-            int str = elf->sections[i].sh_link;
-            if (str < 0 || str >= elf->header.e_shnum || elf->sections[str].sh_type != 3 /*SHT_STRTAB*/)
-            {
-                LOG_ERROR("Invalid strtab link from symtab section");
-                return ERROR_IMAGE_FORMAT_ERROR;       
-            }
-            
-            elf->strtab_size = elf->sections[str].sh_size;
-            elf->strtab = malloc(elf->sections[str].sh_size);
-            
-            retval = fileio_seek(elf->fileio, elf->sections[str].sh_offset);
-            if (retval != ERROR_OK)
-                return retval;
-            
-            retval = fileio_read(elf->fileio, elf->strtab_size, elf->strtab, &done);
-            if (retval != ERROR_OK)
-                return retval;
-            if ((int)done != elf->strtab_size)
-                return ERROR_IMAGE_FORMAT_ERROR;
 
-            
-            break;
-        }
+    if(!elf->is_64_bit){
+        LOG_INFO("parsing 32bit ELF file");
+        elf->num_sections = elf->header.e_shnum;
     
-    if (!elf->symbols || !elf->strtab)
-    {
-        LOG_ERROR("The FLASH plugin file does not contain a symbol table and cannot be loaded.");
-        return ERROR_IMAGE_FORMAT_ERROR;       
+        elf->sections = (Elf32_Shdr *)calloc(elf->header.e_shnum, sizeof(Elf32_Shdr));
+        retval = fileio_seek(elf->fileio, elf->header.e_shoff);
+        if (retval != ERROR_OK)
+            return retval;
+        
+        retval = fileio_read(elf->fileio, sizeof(Elf32_Shdr) * elf->header.e_shnum, elf->sections, &done);
+        if (retval != ERROR_OK)
+            return retval;
+        
+        for (int i = 0; i < elf->num_sections; i++)
+            if (elf->sections[i].sh_type == 2 /*SHT_SYMTAB*/)
+            {
+                if (elf->sections[i].sh_entsize != sizeof(Elf32_Sym))
+                {
+                    LOG_ERROR("Unexpected symtab entry size in %s: %d.", URL, elf->sections[i].sh_entsize);
+                    return ERROR_IMAGE_FORMAT_ERROR;       
+                }
+        
+                elf->num_symbols = elf->sections[i].sh_size / elf->sections[i].sh_entsize;
+                elf->symbols = calloc(elf->num_symbols, elf->sections[i].sh_entsize);
+                retval = fileio_seek(elf->fileio, elf->sections[i].sh_offset);
+                if (retval != ERROR_OK)
+                    return retval;
+                
+                retval = fileio_read(elf->fileio, sizeof(Elf32_Sym) * elf->num_symbols, elf->symbols, &done);
+                if (retval != ERROR_OK)
+                    return retval;
+                if (done != (sizeof(Elf32_Sym) * elf->num_symbols))
+                    return ERROR_IMAGE_FORMAT_ERROR;
+                
+                int str = elf->sections[i].sh_link;
+                if (str < 0 || str >= elf->header.e_shnum || elf->sections[str].sh_type != 3 /*SHT_STRTAB*/)
+                {
+                    LOG_ERROR("Invalid strtab link from symtab section");
+                    return ERROR_IMAGE_FORMAT_ERROR;       
+                }
+                
+                elf->strtab_size = elf->sections[str].sh_size;
+                elf->strtab = malloc(elf->sections[str].sh_size);
+                
+                retval = fileio_seek(elf->fileio, elf->sections[str].sh_offset);
+                if (retval != ERROR_OK)
+                    return retval;
+                
+                retval = fileio_read(elf->fileio, elf->strtab_size, elf->strtab, &done);
+                if (retval != ERROR_OK)
+                    return retval;
+                if ((int)done != elf->strtab_size)
+                    return ERROR_IMAGE_FORMAT_ERROR;
+
+                
+                break;
+            }
+        
+        if (!elf->symbols || !elf->strtab)
+        {
+            LOG_ERROR("The FLASH plugin file does not contain a symbol table and cannot be loaded.");
+            return ERROR_IMAGE_FORMAT_ERROR;       
+        }
+
+    }else{//64 bit elf
+        LOG_INFO("parsing 64bit ELF file");
+        elf->num_sections = elf->header64.e_shnum;
+    
+        elf->sections64 = (Elf64_Shdr *)calloc(elf->header64.e_shnum, sizeof(Elf64_Shdr));
+        retval = fileio_seek(elf->fileio, elf->header64.e_shoff);
+        if (retval != ERROR_OK)
+            return retval;
+        
+        retval = fileio_read(elf->fileio, sizeof(Elf64_Shdr) * elf->header64.e_shnum, elf->sections64, &done);
+        if (retval != ERROR_OK)
+            return retval;
+        
+        for (int i = 0; i < elf->num_sections; i++)
+            if (elf->sections64[i].sh_type == 2 /*SHT_SYMTAB*/)
+            {
+                if (elf->sections64[i].sh_entsize != sizeof(Elf64_Sym))
+                {
+                    LOG_ERROR("Unexpected symtab entry size in %s: %lu.", URL, elf->sections64[i].sh_entsize);
+                    return ERROR_IMAGE_FORMAT_ERROR;       
+                }
+        
+                elf->num_symbols = elf->sections64[i].sh_size / elf->sections64[i].sh_entsize;
+                elf->symbols64 = calloc(elf->num_symbols, elf->sections64[i].sh_entsize);
+                retval = fileio_seek(elf->fileio, elf->sections64[i].sh_offset);
+                if (retval != ERROR_OK)
+                    return retval;
+                
+                retval = fileio_read(elf->fileio, sizeof(Elf64_Sym) * elf->num_symbols, elf->symbols64, &done);
+                if (retval != ERROR_OK)
+                    return retval;
+                if (done != (sizeof(Elf64_Sym) * elf->num_symbols))
+                    return ERROR_IMAGE_FORMAT_ERROR;
+                
+                int str = elf->sections64[i].sh_link;
+                if (str < 0 || str >= elf->header64.e_shnum || elf->sections64[str].sh_type != 3 /*SHT_STRTAB*/)
+                {
+                    LOG_ERROR("Invalid strtab link from symtab section");
+                    return ERROR_IMAGE_FORMAT_ERROR;       
+                }
+                
+                elf->strtab_size = elf->sections64[str].sh_size;
+                elf->strtab = malloc(elf->sections64[str].sh_size);
+                
+                retval = fileio_seek(elf->fileio, elf->sections64[str].sh_offset);
+                if (retval != ERROR_OK)
+                    return retval;
+                
+                retval = fileio_read(elf->fileio, elf->strtab_size, elf->strtab, &done);
+                if (retval != ERROR_OK)
+                    return retval;
+                if ((int)done != elf->strtab_size)
+                    return ERROR_IMAGE_FORMAT_ERROR;
+
+                
+                break;
+            }
+        
+        if (!elf->symbols64 || !elf->strtab)
+        {
+            LOG_ERROR("The FLASH plugin file does not contain a symbol table and cannot be loaded.");
+            return ERROR_IMAGE_FORMAT_ERROR;       
+        }
     }
     
     //TODO: actually read sections

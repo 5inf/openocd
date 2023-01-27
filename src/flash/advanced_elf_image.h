@@ -25,20 +25,36 @@
 #include <target/image.h>
 
 struct advanced_elf_image {
-	struct *image_elf;
+	struct fileio *fileio;
+	bool is_64_bit;
+	union {
+		Elf32_Ehdr header;
+		Elf64_Ehdr header64;
+	};
+	union {
+		Elf32_Phdr *segments;
+		Elf64_Phdr *segments64;
+	};
+	uint32_t segment_count;
+	uint8_t endianness;
     union{
-        Elf32_Sym *symbols32;
+        Elf32_Shdr *sections;
+        Elf64_Shdr *sections64;
+    };
+    int num_sections;
+    char *strtab;
+    int strtab_size;
+    union{
+        Elf32_Sym *symbols;
         Elf64_Sym *symbols64;
     };
     int num_symbols;
-    char *strtab;
-    int strtab_size;
 };
 
 int advanced_elf_image_open(struct advanced_elf_image *image, const char *URL);
 void advanced_elf_image_close(struct advanced_elf_image *image);
 
-uint32_t advanced_elf_image_find_symbol(struct advanced_elf_image *image, const char *symbol_name);
+uint64_t advanced_elf_image_find_symbol(struct advanced_elf_image *image, const char *symbol_name);
 int advanced_elf_image_read_section(struct advanced_elf_image *image, int section, void *buf, size_t buf_size, size_t *done);
 
 

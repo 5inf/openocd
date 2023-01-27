@@ -51,7 +51,7 @@ struct plugin_flash_bank
     uint64_t FLASHPlugin_ProgramAsync;
     uint64_t FLASHPlugin_NotImplemented;
     
-    //Op64tional entries
+    //Optional entries
     uint64_t FLASHPlugin_ProtectSectors;
     uint64_t FLASHPlugin_CheckSectorProtection;
     
@@ -137,10 +137,11 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
     
     for (int i = 0; i < image->num_sections; i++)
     {
-        if (!(image->sections32[i].sh_flags & 2 /*SHF_ALLOC*/))
+        //TODO: 32/64 bit check!!!
+        if (!(image->sections[i].sh_flags & 2 /*SHF_ALLOC*/))
             continue;
         struct memory_backup *region = &plugin->regions[plugin->region_count];
-        retval = save_region(target, region, image->32[i].sh_addr, image->sections32[i].sh_size, i);
+        retval = save_region(target, region, image->sections[i].sh_addr, image->sections[i].sh_size, i);
         if (retval != ERROR_OK)
             break;
         
@@ -163,7 +164,8 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
         void *pBuf = malloc(maxSize);
         for (int i = 0; i < plugin->region_count; i++)
         {
-            if (plugin->regions[i].original_section < 0 || image->sections32[plugin->regions[i].original_section].sh_type == 8 /* NOBITS */)
+            //TODO: 32/64 bit check !!!
+            if (plugin->regions[i].original_section < 0 || image->sections[plugin->regions[i].original_section].sh_type == 8 /* NOBITS */)
                 continue;
             
             size_t done;
@@ -293,8 +295,9 @@ static int loaded_plugin_backup_workarea(struct loaded_plugin *plugin, uint32_t 
     return ERROR_OK;
 }
 
-static int locate_symbol(struct advanced_elf_image *image, const char *URL, uint32_t *ptr, const char *symbol)
+static int locate_symbol(struct advanced_elf_image *image, const char *URL, uint64_t *ptr, const char *symbol)
 {
+    LOG_INFO("%s: Searching symbol '%s'.", URL, symbol);
     *ptr = advanced_elf_image_find_symbol(image, symbol);
     if (!*ptr)
     {
@@ -324,6 +327,8 @@ FLASH_BANK_COMMAND_HANDLER(plugin_flash_bank_command)
     memset(info, 0, sizeof(struct plugin_flash_bank));
     
     const char *URL = CMD_ARGV[6];
+
+    
     
     retval = advanced_elf_image_open(&info->image, URL);
     if (retval != ERROR_OK)

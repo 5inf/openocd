@@ -295,7 +295,7 @@ typedef struct {
 	Elf32_Word p_filesz;	/* Segment size in file */
 	Elf32_Word p_memsz;		/* Segment size in memory */
 	Elf32_Word p_flags;		/* Segment flags */
-	Elf32_Worde p_align;		/* Segment alignment */
+	Elf32_Word p_align;		/* Segment alignment */
 } Elf32_Phdr;
 
 #define PT_LOAD			1		/* Loadable program segment */
@@ -357,7 +357,7 @@ typedef struct
   Elf64_Word	st_name;		/* Symbol name (string tbl index) */
   unsigned char	st_info;		/* Symbol type and binding */
   unsigned char st_other;		/* Symbol visibility */
-  Elf64_Section	st_shndx;		/* Section index */
+  Elf64_Half	st_shndx;		/* Section index */
   Elf64_Addr	st_value;		/* Symbol value */
   Elf64_Xword	st_size;		/* Symbol size */
 } Elf64_Sym;
