@@ -203,7 +203,7 @@ int advanced_elf_image_open(struct advanced_elf_image *elf, const char *URL)
             {
                 if (elf->sections64[i].sh_entsize != sizeof(Elf64_Sym))
                 {
-                    LOG_ERROR("Unexpected symtab entry size in %s: %lu.", URL, elf->sections64[i].sh_entsize);
+                    LOG_ERROR("Unexpected symtab entry size in %s: %"PRIu64".", URL, elf->sections64[i].sh_entsize);
                     return ERROR_IMAGE_FORMAT_ERROR;       
                 }
         
