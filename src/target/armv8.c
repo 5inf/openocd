@@ -1879,3 +1879,30 @@ int armv8_set_dbgreg_bits(struct armv8_common *armv8, unsigned int reg, unsigned
 			armv8->debug_base + reg, tmp);
 	return retval;
 }
+
+int armv8_run_algorithm(struct target *target,
+		int num_mem_params, struct mem_param *mem_params,
+		int num_reg_params, struct reg_param *reg_params,
+		target_addr_t entry_point, target_addr_t exit_point,
+		int timeout_ms, void *arch_info){
+			LOG_ERROR("armv8_run_algorithm not implemented yet.");
+			return 0;
+		}
+
+int armv8_start_algorithm(struct target *target,
+		int num_mem_params, struct mem_param *mem_params,
+		int num_reg_params, struct reg_param *reg_params,
+		target_addr_t entry_point, target_addr_t exit_point,
+		void *arch_info){
+			LOG_ERROR("armv8_start_algorithm not implemented yet.");
+			return 0;
+		}
+
+int armv8_wait_algorithm(struct target *target,
+		int num_mem_params, struct mem_param *mem_params,
+		int num_reg_params, struct reg_param *reg_params,
+		target_addr_t exit_point, int timeout_ms,
+		void *arch_info){
+			LOG_ERROR("armv8_wait_algorithm not implemented yet.");
+			return 0;
+		}

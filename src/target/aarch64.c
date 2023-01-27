@@ -3182,6 +3182,8 @@ struct target_type aarch64_target = {
 	.read_memory = aarch64_read_memory,
 	.write_memory = aarch64_write_memory,
 
+	.run_algorithm = armv8_run_algorithm,
+
 	.add_breakpoint = aarch64_add_breakpoint,
 	.add_context_breakpoint = aarch64_add_context_breakpoint,
 	.add_hybrid_breakpoint = aarch64_add_hybrid_breakpoint,

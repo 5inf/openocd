@@ -293,6 +293,25 @@ int armv8_arch_state(struct target *target);
 int armv8_read_mpidr(struct armv8_common *armv8);
 int armv8_identify_cache(struct armv8_common *armv8);
 int armv8_init_arch_info(struct target *target, struct armv8_common *armv8);
+
+int armv8_run_algorithm(struct target *target,
+		int num_mem_params, struct mem_param *mem_params,
+		int num_reg_params, struct reg_param *reg_params,
+		target_addr_t entry_point, target_addr_t exit_point,
+		int timeout_ms, void *arch_info);
+
+int armv8_start_algorithm(struct target *target,
+		int num_mem_params, struct mem_param *mem_params,
+		int num_reg_params, struct reg_param *reg_params,
+		target_addr_t entry_point, target_addr_t exit_point,
+		void *arch_info);
+
+int armv8_wait_algorithm(struct target *target,
+		int num_mem_params, struct mem_param *mem_params,
+		int num_reg_params, struct reg_param *reg_params,
+		target_addr_t exit_point, int timeout_ms,
+		void *arch_info);
+
 int armv8_mmu_translate_va_pa(struct target *target, target_addr_t va,
 		target_addr_t *val, int meminfo);
 int armv8_mmu_translate_va(struct target *target,  target_addr_t va, target_addr_t *val);
