@@ -209,7 +209,7 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
         struct armv8_algorithm armv8_info;
         armv8_info.common_magic = ARMV8_COMMON_MAGIC;
         armv8_info.core_mode = ARM_MODE_THREAD;
-        uint64_t bp = breakpoint_add(target, init_done_address, 2, BKPT_SOFT);
+        int bp = breakpoint_add(target, init_done_address, 4, BKPT_SOFT);
 	    (void)bp;
 
         retval = target_run_algorithm(target, 0, NULL, sizeof(reg_params) / sizeof(reg_params[0]), reg_params, plugin->entry, init_done_address, plugin->timeouts.load, &armv8_info);
@@ -455,7 +455,7 @@ int plugin_write_async(struct target *target,
     buf_set_u64(reg_params[4].value, 0, 64, sp);
     buf_set_u64(reg_params[5].value, 0, 64, plugin_make_return_addr(return_addr));
     
-    int bp = breakpoint_add(target, return_addr, 2, BKPT_SOFT);
+    int bp = breakpoint_add(target, return_addr, 4, BKPT_SOFT);
 	(void)bp;
     
     retval = target_run_flash_async_algorithm(target,
@@ -581,7 +581,7 @@ static int call_plugin_func(struct target *target, int timeout, uint32_t functio
         reg_param_count = r0ParamIndex + 1;
     
     buf_set_u64(reg_params[0].value, 0, 64, sp);
-    uint64_t bp = breakpoint_add(target, return_addr, 2, BKPT_SOFT);
+    int bp = breakpoint_add(target, return_addr, 4, BKPT_SOFT);
 	(void)bp;
         
     struct armv8_algorithm armv8_info;
