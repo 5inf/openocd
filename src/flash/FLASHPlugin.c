@@ -139,10 +139,10 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
     for (int i = 0; i < image->num_sections; i++)
     {
         //TODO: 32/64 bit check!!!
-        if (!(image->sections[i].sh_flags & 2 /*SHF_ALLOC*/))
+        if (!(image->sections64[i].sh_flags & 2 /*SHF_ALLOC*/))
             continue;
         struct memory_backup *region = &plugin->regions[plugin->region_count];
-        retval = save_region(target, region, image->sections[i].sh_addr, image->sections[i].sh_size, i);
+        retval = save_region(target, region, image->sections64[i].sh_addr, image->sections64[i].sh_size, i);
         if (retval != ERROR_OK)
             break;
         
@@ -434,26 +434,26 @@ int plugin_write_async(struct target *target,
     if (retval != ERROR_OK)
         return retval;
     
-    struct armv7m_algorithm armv7m_info;
+    struct armv8_algorithm armv8_info;
     struct reg_param reg_params[6];
     unsigned sp = (loaded_plugin->sp - 4) & ~3;
     unsigned return_addr = sp;
-    armv7m_info.common_magic = ARMV7M_COMMON_MAGIC;
-    armv7m_info.core_mode = ARM_MODE_THREAD;
+    armv8_info.common_magic = ARMV8_COMMON_MAGIC;
+    armv8_info.core_mode = ARM_MODE_THREAD;
 
-    init_reg_param(&reg_params[0], "r0", 32, PARAM_IN_OUT);
-    init_reg_param(&reg_params[1], "r1", 32, PARAM_OUT);
-    init_reg_param(&reg_params[2], "r2", 32, PARAM_OUT);
-    init_reg_param(&reg_params[3], "r3", 32, PARAM_OUT);
-    init_reg_param(&reg_params[4], "sp", 32, PARAM_OUT);
-    init_reg_param(&reg_params[5], "lr", 32, PARAM_OUT);
+    init_reg_param(&reg_params[0], "r0", 64, PARAM_IN_OUT);
+    init_reg_param(&reg_params[1], "r1", 64, PARAM_OUT);
+    init_reg_param(&reg_params[2], "r2", 64, PARAM_OUT);
+    init_reg_param(&reg_params[3], "r3", 64, PARAM_OUT);
+    init_reg_param(&reg_params[4], "sp", 64, PARAM_OUT);
+    init_reg_param(&reg_params[5], "lr", 64, PARAM_OUT);
 
-    buf_set_u32(reg_params[0].value, 0, 32, offset);
-    buf_set_u32(reg_params[1].value, 0, 32, plugin_info->WorkArea.Address);
-    buf_set_u32(reg_params[2].value, 0, 32, plugin_info->WorkArea.Address + workAreaSize);
-    buf_set_u32(reg_params[3].value, 0, 32, size);
-    buf_set_u32(reg_params[4].value, 0, 32, sp);
-    buf_set_u32(reg_params[5].value, 0, 32, plugin_make_return_addr(return_addr));
+    buf_set_u64(reg_params[0].value, 0, 64, offset);
+    buf_set_u64(reg_params[1].value, 0, 64, plugin_info->WorkArea.Address);
+    buf_set_u64(reg_params[2].value, 0, 64, plugin_info->WorkArea.Address + workAreaSize);
+    buf_set_u64(reg_params[3].value, 0, 64, size);
+    buf_set_u64(reg_params[4].value, 0, 64, sp);
+    buf_set_u64(reg_params[5].value, 0, 64, plugin_make_return_addr(return_addr));
     
     int bp = breakpoint_add(target, return_addr, 2, BKPT_SOFT);
 	(void)bp;
@@ -470,18 +470,18 @@ int plugin_write_async(struct target *target,
         workAreaSize,
         plugin_info->FLASHPlugin_ProgramAsync,
         return_addr,
-        &armv7m_info);
+        &armv8_info);
     
     breakpoint_remove(target, return_addr);
-    unsigned result = 0;
+    uint64_t result = 0;
     
     if (retval == ERROR_OK)
     {
-        result = buf_get_u32(reg_params[0].value, 0, 32);
+        result = buf_get_u64(reg_params[0].value, 0, 64);
 
         if (result < size)
         {
-            LOG_ERROR("FLASHPlugin_ProgramAsync returned %d\n", result);
+            LOG_ERROR("FLASHPlugin_ProgramAsync returned %"PRIu64"\n", result);
             retval = ERROR_FLASH_BANK_INVALID;
         }
     }
@@ -541,12 +541,12 @@ static int call_plugin_func(struct target *target, int timeout, uint32_t functio
     const int r0ParamIndex = 2;
     char *arg_reg_names[] = { "r0", "r1", "r2", "r3" };
     
-    uint32_t return_addr = sp;
+    uint64_t return_addr = sp;
     struct reg_param reg_params[3 + 4];
-    init_reg_param(&reg_params[0], "sp", 32, PARAM_IN_OUT);
-    init_reg_param(&reg_params[1], "lr", 32, PARAM_IN_OUT); //ARM-specific!
-    init_reg_param(&reg_params[r0ParamIndex], arg_reg_names[0], 32, PARAM_IN_OUT); //ARM-specific!
-    buf_set_u32(reg_params[1].value, 0, 32, plugin_make_return_addr(sp));    //Forced thumb mode!
+    init_reg_param(&reg_params[0], "sp", 64, PARAM_IN_OUT);
+    init_reg_param(&reg_params[1], "lr", 64, PARAM_IN_OUT); //ARM-specific!
+    init_reg_param(&reg_params[r0ParamIndex], arg_reg_names[0], 64, PARAM_IN_OUT); //ARM-specific!
+    buf_set_u64(reg_params[1].value, 0, 64, plugin_make_return_addr(sp));    //Forced thumb mode!
     int reg_param_count = r0ParamIndex;
     
     sp -= 4;
@@ -555,7 +555,7 @@ static int call_plugin_func(struct target *target, int timeout, uint32_t functio
     va_start(ap, argc);
     for (int arg = 0; arg < argc; arg++)
     {
-        uint32_t argVal = va_arg(ap, uint32_t);
+        uint64_t argVal = va_arg(ap, uint64_t);
         if ((unsigned)arg >= (sizeof(arg_reg_names) / sizeof(arg_reg_names[0])))
         {
             sp -= 4;
@@ -567,11 +567,11 @@ static int call_plugin_func(struct target *target, int timeout, uint32_t functio
                 reg_params[r0ParamIndex].direction = PARAM_IN_OUT;
             else
             {
-                init_reg_param(&reg_params[r0ParamIndex + arg], arg_reg_names[arg], 32, PARAM_IN_OUT);
+                init_reg_param(&reg_params[r0ParamIndex + arg], arg_reg_names[arg], 64, PARAM_IN_OUT);
                 reg_param_count = r0ParamIndex + arg + 1;
             }
             
-            buf_set_u32(reg_params[r0ParamIndex + arg].value, 0, 32, argVal);
+            buf_set_u64(reg_params[r0ParamIndex + arg].value, 0, 64, argVal);
         }
             
     }
@@ -580,19 +580,19 @@ static int call_plugin_func(struct target *target, int timeout, uint32_t functio
     if (argc == 0)
         reg_param_count = r0ParamIndex + 1;
     
-    buf_set_u32(reg_params[0].value, 0, 32, sp);
-    int bp = breakpoint_add(target, return_addr, 2, BKPT_SOFT);
+    buf_set_u64(reg_params[0].value, 0, 64, sp);
+    uint64_t bp = breakpoint_add(target, return_addr, 2, BKPT_SOFT);
 	(void)bp;
         
-    struct armv7m_algorithm armv7m_info;
-    armv7m_info.common_magic = ARMV7M_COMMON_MAGIC;
-    armv7m_info.core_mode = ARM_MODE_THREAD;
+    struct armv8_algorithm armv8_info;
+    armv8_info.common_magic = ARMV8_COMMON_MAGIC;
+    armv8_info.core_mode = ARM_MODE_THREAD;
 
-    int retval = target_run_algorithm(target, 0, NULL, reg_param_count, reg_params, function, return_addr, timeout, &armv7m_info);
+    int retval = target_run_algorithm(target, 0, NULL, reg_param_count, reg_params, function, return_addr, timeout, &armv8_info);
     breakpoint_remove(target, return_addr);
     
     if (retval == ERROR_OK && result)
-        *result = (int32_t)buf_get_u32(reg_params[r0ParamIndex].value, 0, 32);
+        *result = (int64_t)buf_get_u64(reg_params[r0ParamIndex].value, 0, 64);
     
     for (int i = 0; i < reg_param_count; i++)
         destroy_reg_param(&reg_params[i]);
