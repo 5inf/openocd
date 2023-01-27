@@ -2030,6 +2030,105 @@ int armv8_wait_algorithm(struct target *target,
 		int num_reg_params, struct reg_param *reg_params,
 		target_addr_t exit_point, int timeout_ms,
 		void *arch_info){
-			LOG_ERROR("armv8_wait_algorithm not implemented yet.");
-			return 0;
+
+	struct armv8_common *armv8 = target_to_armv8(target);
+	struct armv8_algorithm *armv8_algorithm_info = arch_info;
+	int retval = ERROR_OK;
+
+	/* NOTE: armv8_run_algorithm requires that each algorithm uses a software breakpoint
+	 * at the exit point */
+
+	if (armv8_algorithm_info->common_magic != ARMV8_COMMON_MAGIC) {
+		LOG_ERROR("current target isn't an ARMV8 target");
+		return ERROR_TARGET_INVALID;
+	}
+
+	retval = target_wait_state(target, TARGET_HALTED, timeout_ms);
+	/* If the target fails to halt due to the breakpoint, force a halt */
+	if (retval != ERROR_OK || target->state != TARGET_HALTED) {
+		retval = target_halt(target);
+		if (retval != ERROR_OK)
+			return retval;
+		retval = target_wait_state(target, TARGET_HALTED, 500);
+		if (retval != ERROR_OK)
+			return retval;
+		return ERROR_TARGET_TIMEOUT;
+	}
+
+	if (exit_point) {
+		/* PC value has been cached in cortex_m_debug_entry() */
+		uint64_t pc = buf_get_u64(armv8->arm.pc->value, 0, 64);
+		if (pc != exit_point) {
+			LOG_DEBUG("failed algorithm halted at 0x%" PRIx64 ", expected 0x%" TARGET_PRIxADDR,
+					  pc, exit_point);
+			return ERROR_TARGET_ALGO_EXIT;
 		}
+	}
+
+	/* Read memory values to mem_params[] */
+	for (int i = 0; i < num_mem_params; i++) {
+		if (mem_params[i].direction != PARAM_OUT) {
+			retval = target_read_buffer(target, mem_params[i].address,
+					mem_params[i].size,
+					mem_params[i].value);
+			if (retval != ERROR_OK)
+				return retval;
+		}
+	}
+
+	/* Copy core register values to reg_params[] */
+	for (int i = 0; i < num_reg_params; i++) {
+		if (reg_params[i].direction != PARAM_OUT) {
+			struct reg *reg = register_get_by_name(armv8->arm.core_cache,
+					reg_params[i].reg_name,
+					false);
+
+			if (!reg) {
+				LOG_ERROR("BUG: register '%s' not found", reg_params[i].reg_name);
+				return ERROR_COMMAND_SYNTAX_ERROR;
+			}
+
+			if (reg->size != reg_params[i].size) {
+				LOG_ERROR(
+					"BUG: register '%s' size doesn't match reg_params[i].size",
+					reg_params[i].reg_name);
+				return ERROR_COMMAND_SYNTAX_ERROR;
+			}
+
+			buf_set_u64(reg_params[i].value, 0, 32, buf_get_u64(reg->value, 0, 64));
+		}
+	}
+	for (int i = armv8->arm.core_cache->num_regs - 1; i >= 0; i--) {
+		struct reg *reg = &armv8->arm.core_cache->reg_list[i];
+		if (!reg->exist)
+			continue;
+
+		uint32_t regvalue;
+		regvalue = buf_get_u32(reg->value, 0, 32);
+		if (regvalue != armv8_algorithm_info->context[i]) {
+			LOG_DEBUG("restoring register %s with value 0x%8.8" PRIx32,
+					  reg->name, armv8_algorithm_info->context[i]);
+			buf_set_u32(reg->value,
+				0, 32, armv8_algorithm_info->context[i]);
+			reg->valid = true;
+			reg->dirty = true;
+		}
+	}
+
+	/* restore previous core mode */
+	//TODO: fix this if necessary
+	/*
+	if (armv8_algorithm_info->core_mode != armv8->arm.core_mode) {
+		LOG_DEBUG("restoring core_mode: 0x%2.2x", armv8_algorithm_info->core_mode);
+		buf_set_u32(armv8->arm.core_cache->reg_list[ARMV8_CONTROL].value,
+			0, 1, armv8_algorithm_info->core_mode);
+		armv8->arm.core_cache->reg_list[ARMV8_CONTROL].dirty = true;
+		armv8->arm.core_cache->reg_list[ARMV8_CONTROL].valid = true;
+	}*/
+
+	armv8->arm.core_mode = armv8_algorithm_info->core_mode;
+	
+	LOG_ERROR("armv8_wait_algorithm not tested yet. It will surely not work");
+
+	return retval;
+}
