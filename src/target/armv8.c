@@ -16,6 +16,8 @@
 #include "armv8.h"
 #include "arm_disassembler.h"
 
+#include "algorithm.h"
+
 #include "register.h"
 #include <helper/binarybuffer.h>
 #include <helper/command.h>
@@ -1885,8 +1887,24 @@ int armv8_run_algorithm(struct target *target,
 		int num_reg_params, struct reg_param *reg_params,
 		target_addr_t entry_point, target_addr_t exit_point,
 		int timeout_ms, void *arch_info){
-			LOG_ERROR("armv8_run_algorithm not implemented yet.");
-			return 0;
+
+	int retval;
+
+	retval = armv8_start_algorithm(target,
+			num_mem_params, mem_params,
+			num_reg_params, reg_params,
+			entry_point, exit_point,
+			arch_info);
+
+	if (retval == ERROR_OK)
+		retval = armv8_wait_algorithm(target,
+				num_mem_params, mem_params,
+				num_reg_params, reg_params,
+				exit_point, timeout_ms,
+				arch_info);
+
+	return retval;
+
 		}
 
 int armv8_start_algorithm(struct target *target,
@@ -1894,9 +1912,118 @@ int armv8_start_algorithm(struct target *target,
 		int num_reg_params, struct reg_param *reg_params,
 		target_addr_t entry_point, target_addr_t exit_point,
 		void *arch_info){
-			LOG_ERROR("armv8_start_algorithm not implemented yet.");
-			return 0;
+
+
+	struct armv8_common *armv8 = target_to_armv8(target);
+	struct armv8_algorithm *armv8_algorithm_info = arch_info;
+	enum arm_mode core_mode = armv8->arm.core_mode;
+	int retval = ERROR_OK;
+
+	/* NOTE: armv8_run_algorithm requires that each algorithm uses a software breakpoint
+	 * at the exit point */
+
+	if (armv8_algorithm_info->common_magic != ARMV8_COMMON_MAGIC) {
+		LOG_ERROR("current target isn't an ARMV8 target");
+		return ERROR_TARGET_INVALID;
+	}
+
+	if (target->state != TARGET_HALTED) {
+		LOG_WARNING("target not halted");
+		return ERROR_TARGET_NOT_HALTED;
+	}
+
+	/* Store all non-debug execution registers to armv8_algorithm_info context */
+	for (unsigned i = 0; i < armv8->arm.core_cache->num_regs; i++) {
+		struct reg *reg = &armv8->arm.core_cache->reg_list[i];
+		if (!reg->exist)
+			continue;
+
+		if (!reg->valid)
+			armv8_get_core_reg(reg);
+
+		if (!reg->valid)
+			LOG_TARGET_WARNING(target, "Storing invalid register %s", reg->name);
+
+		armv8_algorithm_info->context[i] = buf_get_u64(reg->value, 0, 64);
+	}
+
+	for (int i = 0; i < num_mem_params; i++) {
+		if (mem_params[i].direction == PARAM_IN)
+			continue;
+		retval = target_write_buffer(target, mem_params[i].address,
+				mem_params[i].size,
+				mem_params[i].value);
+		if (retval != ERROR_OK)
+			return retval;
+	}
+
+	for (int i = 0; i < num_reg_params; i++) {
+		if (reg_params[i].direction == PARAM_IN)
+			continue;
+
+		struct reg *reg =
+			register_get_by_name(armv8->arm.core_cache, reg_params[i].reg_name, false);
+/*		uint32_t regvalue; */
+
+		if (!reg) {
+			LOG_ERROR("BUG: register '%s' not found", reg_params[i].reg_name);
+			return ERROR_COMMAND_SYNTAX_ERROR;
 		}
+
+		if (reg->size != reg_params[i].size) {
+			LOG_ERROR("BUG: register '%s' size doesn't match reg_params[i].size",
+				reg_params[i].reg_name);
+			return ERROR_COMMAND_SYNTAX_ERROR;
+		}
+
+/*		regvalue = buf_get_u32(reg_params[i].value, 0, 32); */
+		armv8_set_core_reg(reg, reg_params[i].value);
+	}
+
+	{
+		/*
+		 * Ensure xPSR.T is set to avoid trying to run things in arm
+		 * (non-thumb) mode, which armv7m does not support.
+		 *
+		 * We do this by setting the entirety of xPSR, which should
+		 * remove all the unknowns about xPSR state.
+		 *
+		 * Because xPSR.T is populated on reset from the vector table,
+		 * it might be 0 if the vector table has "bad" data in it.
+		 */
+		struct reg *reg = &armv8->arm.core_cache->reg_list[ARMV8_XPSR];
+		buf_set_u64(reg->value, 0, 64, 0x01000000);
+		reg->valid = true;
+		reg->dirty = true;
+	}
+
+	if (armv8_algorithm_info->core_mode != ARM_MODE_ANY &&
+			armv8_algorithm_info->core_mode != core_mode) {
+
+		/* we cannot set ARM_MODE_HANDLER, so use ARM_MODE_THREAD instead */
+		if (armv8_algorithm_info->core_mode == ARM_MODE_HANDLER) {
+			armv8_algorithm_info->core_mode = ARM_MODE_THREAD;
+			LOG_INFO("ARM_MODE_HANDLER not currently supported, using ARM_MODE_THREAD instead");
+		}
+
+		
+		//TODO: fix this if necessary
+		/*LOG_DEBUG("setting core_mode: 0x%2.2x", armv8_algorithm_info->core_mode);
+		buf_set_u32(armv8->arm.core_cache->reg_list[ARMV8_CONTROL].value,
+			0, 1, armv8_algorithm_info->core_mode);
+		armv8->arm.core_cache->reg_list[ARMV8_CONTROL].dirty = true;
+		armv8->arm.core_cache->reg_list[ARMV8_CONTROL].valid = true;
+		*/
+	}
+
+	/* save previous core mode */
+	armv8_algorithm_info->core_mode = core_mode;
+
+	retval = target_resume(target, 0, entry_point, 1, 1);
+
+	LOG_ERROR("armv8_start_algorithm not tested yet. It will surely not work");
+	return retval;
+}
 
 int armv8_wait_algorithm(struct target *target,
 		int num_mem_params, struct mem_param *mem_params,

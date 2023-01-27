@@ -294,6 +294,14 @@ int armv8_read_mpidr(struct armv8_common *armv8);
 int armv8_identify_cache(struct armv8_common *armv8);
 int armv8_init_arch_info(struct target *target, struct armv8_common *armv8);
 
+struct armv8_algorithm {
+	unsigned int common_magic;
+
+	enum arm_mode core_mode;
+
+	uint32_t context[ARMV8_LAST_REG]; /* ARMV8_NUM_REGS */
+};
+
 int armv8_run_algorithm(struct target *target,
 		int num_mem_params, struct mem_param *mem_params,
 		int num_reg_params, struct reg_param *reg_params,
