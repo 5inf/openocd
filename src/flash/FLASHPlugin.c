@@ -106,7 +106,8 @@ int save_region(struct target *target, struct memory_backup *region, Elf32_Addr 
     region->size = sh_size;
     region->original_contents = malloc(sh_size);
     region->original_section = sectionNumber;
-        
+
+    //we might pass a 0 for count to target_read_memory, which causes an uncaught underflow    
     return target_read_memory(target, region->base_address, 4, (region->size + 3) / 4, (uint8_t *)region->original_contents);
 }
 
@@ -446,7 +447,7 @@ int plugin_write_async(struct target *target,
     init_reg_param(&reg_params[2], "r2", 64, PARAM_OUT);
     init_reg_param(&reg_params[3], "r3", 64, PARAM_OUT);
     init_reg_param(&reg_params[4], "sp", 64, PARAM_OUT);
-    init_reg_param(&reg_params[5], "lr", 64, PARAM_OUT);
+    init_reg_param(&reg_params[5], "r30", 64, PARAM_OUT); //TODO: aarch64 has no lr register it is instead r30 / x30 (??)
 
     buf_set_u64(reg_params[0].value, 0, 64, offset);
     buf_set_u64(reg_params[1].value, 0, 64, plugin_info->WorkArea.Address);
