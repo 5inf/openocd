@@ -107,7 +107,11 @@ int save_region(struct target *target, struct memory_backup *region, Elf32_Addr 
     region->original_contents = malloc(sh_size);
     region->original_section = sectionNumber;
 
-    //we might pass a 0 for count to target_read_memory, which causes an uncaught underflow    
+    //we might pass a 0 for count to target_read_memory, which causes an uncaught underflow  
+    if(sh_size<=0){
+      LOG_WARNING("Requested to save region of size 0");  
+      return ERROR_OK;
+    }
     return target_read_memory(target, region->base_address, 4, (region->size + 3) / 4, (uint8_t *)region->original_contents);
 }
 
@@ -442,12 +446,12 @@ int plugin_write_async(struct target *target,
     armv8_info.common_magic = ARMV8_COMMON_MAGIC;
     armv8_info.core_mode = ARM_MODE_THREAD;
 
-    init_reg_param(&reg_params[0], "r0", 64, PARAM_IN_OUT);
-    init_reg_param(&reg_params[1], "r1", 64, PARAM_OUT);
-    init_reg_param(&reg_params[2], "r2", 64, PARAM_OUT);
-    init_reg_param(&reg_params[3], "r3", 64, PARAM_OUT);
+    init_reg_param(&reg_params[0], "x0", 64, PARAM_IN_OUT);
+    init_reg_param(&reg_params[1], "x1", 64, PARAM_OUT);
+    init_reg_param(&reg_params[2], "x2", 64, PARAM_OUT);
+    init_reg_param(&reg_params[3], "x3", 64, PARAM_OUT);
     init_reg_param(&reg_params[4], "sp", 64, PARAM_OUT);
-    init_reg_param(&reg_params[5], "r30", 64, PARAM_OUT); //TODO: aarch64 has no lr register it is instead r30 / x30 (??)
+    init_reg_param(&reg_params[5], "x30", 64, PARAM_OUT); //TODO: aarch64 has no lr register it is instead r30 / x30 (??)
 
     buf_set_u64(reg_params[0].value, 0, 64, offset);
     buf_set_u64(reg_params[1].value, 0, 64, plugin_info->WorkArea.Address);
@@ -540,14 +544,14 @@ static int call_plugin_func(struct target *target, int timeout, uint32_t functio
 {
     sp = (sp - 4) & ~3;
     const int r0ParamIndex = 2;
-    char *arg_reg_names[] = { "r0", "r1", "r2", "r3" };
+    char *arg_reg_names[] = { "x0", "x1", "x2", "x3" };
     
     uint64_t return_addr = sp;
     struct reg_param reg_params[3 + 4];
     init_reg_param(&reg_params[0], "sp", 64, PARAM_IN_OUT);
-    init_reg_param(&reg_params[1], "lr", 64, PARAM_IN_OUT); //ARM-specific!
+    init_reg_param(&reg_params[1], "x30", 64, PARAM_IN_OUT); //ARM-specific!
     init_reg_param(&reg_params[r0ParamIndex], arg_reg_names[0], 64, PARAM_IN_OUT); //ARM-specific!
-    buf_set_u64(reg_params[1].value, 0, 64, plugin_make_return_addr(sp));    //Forced thumb mode!
+    buf_set_u64(reg_params[1].value, 0, 64, plugin_make_return_addr(sp));    //Forced thumb mode! --> we might need aarch64 mode because el3 registers are only available there
     int reg_param_count = r0ParamIndex;
     
     sp -= 4;
